@@ -35,9 +35,9 @@ public class PasswordServer {
 
 	// Runs to allow PasswordClient.java to register new Password
 	public static void main(String[] args) throws IOException, InterruptedException {
-		final PasswordServer pwServer = new PasswordServer();
-		pwServer.start();
-		pwServer.blockUntilShutdown();
+		final PasswordServer passwordServer = new PasswordServer();
+		passwordServer.start();
+		passwordServer.blockUntilShutdown();
 	}
 
 } // PasswordServer

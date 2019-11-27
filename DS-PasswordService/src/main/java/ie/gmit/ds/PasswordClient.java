@@ -1,120 +1,111 @@
 package ie.gmit.ds;
 
-import java.util.Scanner;
-import java.util.logging.Logger;
-import java.util.logging.Level;
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
-import com.google.protobuf.ByteString;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import com.google.protobuf.BoolValue;
+import com.google.protobuf.ByteString;
+import ie.gmit.ds.utilities.PasswordConstants;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import io.grpc.stub.StreamObserver;
+import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import ie.gmit.ds.utilities.Passwords;
+import io.grpc.stub.StreamObserver;
 
 public class PasswordClient {
 
-	// Scanner for user input
-	Scanner userIn = new Scanner(System.in);
-
+	// Byte Array
+	static byte[] saltByte;
+	
 	// Variables
-	private int userId;
-	private String userPw;
+	private ByteString salt;
+	private ByteString hashedPassword;
+	
+	// Getters
+	public ByteString getSalt() {
+		return salt;
+	}
 
-	byte[] saltByte;
-	ByteString salt;
-	ByteString hashedPw;
-	boolean input = false;
+	public ByteString getHashedPassword() {
+		return hashedPassword;
+	}
 
+	// Logger
 	private static final Logger logger = Logger.getLogger(PasswordClient.class.getName());
 	private final ManagedChannel channel;
-	// **Generate sources in maven**
 	private final PasswordServiceGrpc.PasswordServiceStub asyncPasswordService;
 	private final PasswordServiceGrpc.PasswordServiceBlockingStub syncPasswordService;
 
+	
 	public PasswordClient(String host, int port) {
 		channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
-		asyncPasswordService = PasswordServiceGrpc.newStub(channel);
 		syncPasswordService = PasswordServiceGrpc.newBlockingStub(channel);
-
+		asyncPasswordService = PasswordServiceGrpc.newStub(channel);
 	}
 
+	// Shutdown 
 	public void shutdown() throws InterruptedException {
 		channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
 	}
-
-	// User input to add password
-	@SuppressWarnings("unused")
-	public void addPw() {
-
-		System.out.println("Please Enter User ID: ");
-		userId = userIn.nextInt();
-
-		while (!input) {
-			System.out.println("\nPlease Enter User Password (Must Contain Min=2 Letters and Min=2 Numbers): ");
-			userPw = userIn.next();
-
-			if (Passwords.isValid(userPw.toCharArray()))
-				input = true;
-			else
-				System.out.println("The Password You Entered is Invalid ! ");
-		}
-
-		saltByte = Passwords.getNextSalt();
-		salt = ByteString.copyFrom(saltByte);
-		hashedPw = ByteString.copyFrom(Passwords.hash(userPw.toCharArray(), saltByte));
-
-		PasswordHashRequest password = PasswordHashRequest.newBuilder().setUserId(userId).setPassword(userPw).build();
-		PasswordHashResponse pwResponse = PasswordHashResponse.newBuilder().setUserId(userId)
-				.setHashedPassword(hashedPw).setSalt(salt).build();
-
-		try {
-			pwResponse = syncPasswordService.hash(password);
-		} catch (StatusRuntimeException exception) {
-			logger.log(Level.WARNING, "GRPC FAILED: (0)", exception.getStatus());
-			return;
-		}
-	}
-
-	// Validate if password matches requirements
-	public void validatePw() {
-
-		StreamObserver<BoolValue> responseObserver = new StreamObserver<BoolValue>() {
-			@Override
-			public void onNext(BoolValue value) {
-				if (value.getValue())
-					System.out.println("The Password Entered is Correct !");
-				else
-					System.out.println("The Password Entered is Invalid !");
-			}
+	
+	// Create New User
+	public byte[] hpw;
+	public String hpwString;
+	public byte[] sby;
+	public String sbyString;
+	public User newUser;
+	
+	public void addPassword(int userId, String password) {
+		StreamObserver<PasswordHashResponse> responseObserver = new StreamObserver<PasswordHashResponse>() {
 
 			@Override
-			public void onCompleted() {
+			public void onNext(PasswordHashResponse value) {
+				hashedPassword = value.getHashedPassword();
+				salt = value.getSalt();
+				
+
+				hpw = hashedPassword.toByteArray();
+				hpwString = Arrays.toString(hpw);
+
+				sby = salt.toByteArray();
+				sbyString = Arrays.toString(sby);
 			}
 
 			@Override
 			public void onError(Throwable t) {
+				Status status = Status.fromThrowable(t);
+				logger.log(Level.WARNING, "RPC ERROR: {0}", status);
 			}
 
+			@Override
+			public void onCompleted() {}
 		};
-
+				
 		try {
-			asyncPasswordService.validate(PasswordValidateRequest.newBuilder().setPassword(userPw)
-					.setHashedPassword(hashedPw).setSalt(salt).build(), responseObserver);
-		} catch (StatusRuntimeException exception1) {
-			logger.log(Level.WARNING, "GRPC FAILED: (0)", exception1.getStatus());
+			PasswordHashRequest request = PasswordHashRequest.newBuilder().setUserId(userId).setPassword(password).build();
+			asyncPasswordService.hash(request, responseObserver);
+			TimeUnit.SECONDS.sleep(PasswordConstants.SLEEP_TIME);
+		} catch (StatusRuntimeException | InterruptedException ex) {
+			logger.log(Level.WARNING, "RPC FAILED: {0}", ex.fillInStackTrace());
 		}
+
+		logger.info("Hashing Finished..");
+		return;
 	}
 
-	public static void main(String[] args) throws Exception {
-		PasswordClient client = new PasswordClient("localhost", 45620);
+	// Password Validation
+	public boolean validatePassword(String password, ByteString hashed, ByteString salt) {
 		try {
-			client.addPw();
-			client.validatePw();
-		} finally {
-			// Do not terminate for async response
-			Thread.currentThread().join();
+			System.out.println("Client: validatePassword");
+			BoolValue value = syncPasswordService.validate(PasswordValidateRequest.newBuilder().setPassword(password)
+					.setHashedPassword(hashed).setSalt(salt).build());
+			
+			return(value.getValue());
+		} catch (StatusRuntimeException e) {
+			logger.log(Level.WARNING, "RPC FAILED: {0}", e.getStatus());
+			return false;
 		}
 	}
-
+	
 } // PasswordClient
