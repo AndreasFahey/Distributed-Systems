@@ -23,6 +23,7 @@ Part2: RESTful User Account Service
 - Run the server.jar - "java -jar server.jar"
 - Run the service DS-PasswordService-0.0.1-SNAPSHOT.jar "java -jar DS-PasswordService/target/DS-PasswordService-0.0.1-SNAPSHOT.jar server   DS-PasswordService/accountAPIConfig.yaml". You must clone to use this jar in the target directory to be able also use accountAPI.yaml
 - Open Postman and start trying GET, POST, DELETE, PUT. JSON works fine but had trouble trying to get XML to work, throws a Error [500].
+- Swagger Hub Open API URL: https://app.swaggerhub.com/apis/AndreasFahey/UserAPI/1
 
 References for Part2:
 - https://howtodoinjava.com/dropwizard/tutorial-and-hello-world-example/
@@ -31,3 +32,4 @@ References for Part2:
 - https://www.youtube.com/watch?v=5jQSat1cKMo
 - https://www.youtube.com/watch?v=501dpx2IjGY
 - https://cmder.net/
+- https://app.swaggerhub.com/help/tutorials/openapi-3-tutorial
